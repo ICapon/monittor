@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>monitor-01 :: root access</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    canvas#matrix {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+
+    .terminal {
+      position: relative;
+      z-index: 1;
+      width: min(680px, 90vw);
+      margin: 8vh auto 0;
+      background: rgba(0, 10, 0, 0.85);
+      border: 1px solid #0f0;
+      border-radius: 6px;
+      box-shadow: 0 0 25px rgba(0, 255, 0, 0.35);
+      color: #0f0;
+      padding: 24px 28px;
+    }
+
+    .terminal-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      opacity: 0.6;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #0f0;
+    }
+
+    pre.ascii {
+      font-size: 11px;
+      line-height: 1.15;
+      color: #0f0;
+      text-shadow: 0 0 6px #0f0;
+      margin-bottom: 14px;
+      white-space: pre;
+      overflow-x: auto;
+    }
+
+    .line {
+      font-size: 15px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+
+    .prompt {
+      color: #6f6;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 9px;
+      height: 16px;
+      background: #0f0;
+      vertical-align: middle;
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    .typed {
+      border-right: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="matrix"></canvas>
+
+  <div class="terminal">
+    <div class="terminal-bar">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+    </div>
+    <pre class="ascii">
+ __  __  ___  _  _  ___ ___ ___  ___
+|  \/  |/ _ \| \| ||_ _|_ _/ _ \| _ \
+| |\/| | (_) | .` | | | | | (_) |   /
+|_|  |_|\___/|_|\_| |_| |_|\___/|_|_\
+</pre>
+    <div id="output" class="line"></div>
+  </div>
+
+  <script>
+    // matrix rain background
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const chars = 'アァカサタナハマヤラワ0123456789ABCDEF$#&%';
+    const fontSize = 14;
+    const columns = Math.floor(canvas.width / fontSize);
+    const drops = new Array(columns).fill(1);
+
+    function drawMatrix() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#0f0';
+      ctx.font = fontSize + 'px monospace';
+      for (let i = 0; i < drops.length; i++) {
+        const text = chars[Math.floor(Math.random() * chars.length)];
+        ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }
+    setInterval(drawMatrix, 40);
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    });
+
+    // typed boot sequence
+    const lines = [
+      'ACCESS GRANTED.',
+      'connection secured // node: monitor-01',
+      'welcome, root.',
+    ];
+    const output = document.getElementById('output');
+    let lineIndex = 0;
+    let charIndex = 0;
+
+    function typeNext() {
+      if (lineIndex >= lines.length) {
+        output.innerHTML += '\n<span class="prompt">root@monitor-01:~$</span> <span class="cursor"></span>';
+        return;
+      }
+      const current = lines[lineIndex];
+      if (charIndex <= current.length) {
+        output.textContent = lines.slice(0, lineIndex).join('\n') +
+          (lineIndex > 0 ? '\n' : '') + current.slice(0, charIndex);
+        charIndex++;
+        setTimeout(typeNext, 35);
+      } else {
+        lineIndex++;
+        charIndex = 0;
+        setTimeout(typeNext, 250);
+      }
+    }
+    typeNext();
+  </script>
+</body>
+</html>

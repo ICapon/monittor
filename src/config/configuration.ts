@@ -24,6 +24,10 @@ export default () => ({
     name: process.env.AUTH_COOKIE_NAME ?? 'monitor_session',
     domain: process.env.COOKIE_DOMAIN || undefined,
   },
+  visitorCookie: {
+    name: process.env.VISITOR_COOKIE_NAME ?? 'visitor_id',
+    domain: process.env.COOKIE_DOMAIN || undefined,
+  },
   seedAdmin: {
     username: process.env.SEED_ADMIN_USERNAME,
     password: process.env.SEED_ADMIN_PASSWORD,

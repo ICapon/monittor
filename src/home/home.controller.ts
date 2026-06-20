@@ -1,11 +1,4 @@
-import {
-  Controller,
-  ForbiddenException,
-  Get,
-  Header,
-  Req,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Controller, ForbiddenException, Get, Header, Req, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -28,22 +21,19 @@ export class HomeController {
 
   @Get()
   @Header('Content-Type', 'text/html')
-  getIntro(@Req() req: Request): string {
-    this.homeService.logVisit(req);
+  getIntro(): string {
     return this.renderTemplate('intro.html');
   }
 
   @Get('matrix')
   @Header('Content-Type', 'text/html')
-  getMatrix(@Req() req: Request): string {
-    this.homeService.logVisit(req);
+  getMatrix(): string {
     return this.renderTemplate('matrix.html');
   }
 
   @Get('terminal')
   @Header('Content-Type', 'text/html')
   async getTerminal(@Req() req: Request): Promise<string> {
-    this.homeService.logVisit(req);
     const session = this.getSession(req);
     const commands = session
       ? await this.commandsService.findAccessibleCommandsForUser(session.sub)

@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -7,6 +7,7 @@ import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { typeOrmConfig } from './config/database.config';
 import { AuthMiddleware } from './auth/middleware/auth.middleware';
+import { UnauthorizedFilter } from './auth/filters/unauthorized.filter';
 import { HomeModule } from './home/home.module';
 import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
@@ -25,7 +26,10 @@ import { AuthModule } from './auth/auth.module';
     UsersModule,
     AuthModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_FILTER, useClass: UnauthorizedFilter },
+  ],
 })
 export class AppModule implements NestModule {
   // Registered here (not in UsersModule) to avoid a circular module

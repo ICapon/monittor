@@ -78,6 +78,10 @@ export class VisitsService {
     return { items, total, limit: params.limit, offset: params.offset };
   }
 
+  findById(id: string): Promise<Visit | null> {
+    return this.visitsRepository.findOne({ where: { id } });
+  }
+
   private buildDateRangeFilter(startDate?: string, endDate?: string) {
     if (!startDate && !endDate) return undefined;
 

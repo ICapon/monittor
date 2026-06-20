@@ -65,7 +65,7 @@
 </head>
 <body>
   <div class="term-body" id="term-body">
-    <div class="term-line">Welcome to monitor-01. Type a command and press enter.</div>
+    <div class="term-line">Welcome back. Type a command and press enter.</div>
   </div>
   <input id="hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false" />
 
@@ -311,10 +311,44 @@
           if (!extraCommands.some((entry) => entry.name === 'get-visits')) {
             // Not granted — behaves like any other unknown command.
             addPromptLine(getPrompt());
+          } else if (args.length > 0) {
+            // get-visits <id> — full detail for one visit.
+            fetch('/visits/' + encodeURIComponent(args[0]), { credentials: 'include' })
+              .then((res) => {
+                if (res.status === 404) {
+                  printLine('get-visits: no visit with that id.');
+                  return;
+                }
+                if (!res.ok) {
+                  printLine('get-visits: permission denied.');
+                  return;
+                }
+                return res.json().then((v) => {
+                  printLine('id:          ' + v.id);
+                  printLine('visitorId:   ' + v.visitorId);
+                  printLine('userId:      ' + (v.userId || '—'));
+                  printLine('ip:          ' + v.ip);
+                  printLine('location:    ' + v.location);
+                  printLine('browser:     ' + v.browser);
+                  printLine('engine:      ' + v.engine);
+                  printLine('os:          ' + v.os);
+                  printLine('device:      ' + v.device);
+                  printLine('language:    ' + v.language);
+                  printLine('referer:     ' + v.referer);
+                  printLine('user-agent:  ' + v.userAgent);
+                  printLine('lastPath:    ' + v.lastPath);
+                  printLine('visitCount:  ' + v.visitCount);
+                  printLine('metadata:    ' + (v.metadata ? JSON.stringify(v.metadata) : '—'));
+                  printLine('createdAt:   ' + v.createdAt);
+                  printLine('updatedAt:   ' + v.updatedAt);
+                });
+              })
+              .catch(() => printLine('connection error: could not reach the server.'))
+              .finally(() => addPromptLine(getPrompt()));
           } else {
             // Default page only (first 20, most recent first) — full
             // limit/offset/desc/date filtering is available by calling
-            // GET /visits directly.
+            // GET /visits directly. Run "get-visits <id>" for full detail.
             fetch('/visits', { credentials: 'include' })
               .then((res) => {
                 if (!res.ok) {
@@ -328,7 +362,7 @@
                     data.items.forEach((v) => {
                       const seen = new Date(v.updatedAt).toISOString().slice(0, 16).replace('T', ' ');
                       printLine(
-                        seen + '  ' + v.ip.padEnd(16, ' ') + v.lastPath.padEnd(14, ' ') + 'visits:' + v.visitCount,
+                        v.id + '  ' + seen + '  ' + v.ip.padEnd(16, ' ') + v.lastPath.padEnd(14, ' ') + 'visits:' + v.visitCount,
                       );
                     });
                   }

@@ -17,7 +17,13 @@ export class VisitsModule implements NestModule {
   // No circular-dependency concern here (unlike UsersModule): AuthModule
   // does not depend on VisitsModule, so VisitsModule can safely import it
   // and apply AuthMiddleware directly, instead of routing through AppModule.
+  // Both routes listed explicitly — a plain path string like 'visits' only
+  // matches that exact path, NOT 'visits/:id', so the detail route needs
+  // its own entry or it would be left completely unauthenticated.
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(AuthMiddleware).forRoutes({ path: 'visits', method: RequestMethod.GET });
+    consumer.apply(AuthMiddleware).forRoutes(
+      { path: 'visits', method: RequestMethod.GET },
+      { path: 'visits/:id', method: RequestMethod.GET },
+    );
   }
 }

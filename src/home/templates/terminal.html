@@ -72,16 +72,23 @@
   <script>
     const PROMPT_USER = 'user: ';
     const PROMPT_PASSWORD = 'password: ';
+    const PROMPT_NEW_USERNAME = 'new username: ';
+    const PROMPT_NEW_PASSWORD = 'new password: ';
 
     const termBody = document.getElementById('term-body');
     const hiddenInput = document.getElementById('hidden-input');
 
     let mode = 'command';
     let pendingUsername = '';
+    let pendingNewUsername = '';
     // Replaced server-side (see home.controller.ts) with the username from
     // the session cookie, if any — no extra request needed to know who's
     // already logged in.
     let currentUser = /*__CURRENT_USER__*/ null;
+    // Extra commands granted to the current user from the database (see
+    // CommandsService) — empty for anonymous visitors. Each entry is
+    // {name, response}; running one just prints its response verbatim.
+    let extraCommands = /*__CURRENT_COMMANDS__*/ [];
 
     function getPrompt() {
       return (currentUser || 'root') + '@monitor-01:~$ ';
@@ -169,12 +176,46 @@
             }
             return res.json().then((data) => {
               currentUser = data.username;
+              extraCommands = data.commands || [];
               printLine('access granted.');
             });
           })
           .catch(() => printLine('connection error: could not reach auth service.'))
           .finally(() => {
             pendingUsername = '';
+            addPromptLine(getPrompt());
+          });
+        return;
+      }
+
+      if (mode === 'adduser-username') {
+        pendingNewUsername = value;
+        mode = 'adduser-password';
+        addPromptLine(PROMPT_NEW_PASSWORD, true);
+        return;
+      }
+
+      if (mode === 'adduser-password') {
+        mode = 'command';
+        fetch('/users', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: pendingNewUsername, password: value }),
+        })
+          .then((res) => {
+            if (res.ok) {
+              printLine('user "' + pendingNewUsername + '" created.');
+              return;
+            }
+            return res
+              .json()
+              .then((data) => printLine('adduser: ' + (data.message || 'failed to create user.')))
+              .catch(() => printLine('adduser: failed to create user.'));
+          })
+          .catch(() => printLine('connection error: could not reach the server.'))
+          .finally(() => {
+            pendingNewUsername = '';
             addPromptLine(getPrompt());
           });
         return;
@@ -194,6 +235,9 @@
           printLine('                 (run with no arguments; password is entered');
           printLine('                 at a separate hidden prompt, never inline)');
           printLine('logout           end the current session');
+          extraCommands.forEach((entry) => {
+            printLine(entry.name.padEnd(17, ' ') + '(granted command)');
+          });
           addPromptLine(getPrompt());
           break;
         case 'auth':
@@ -214,14 +258,62 @@
             fetch('/auth/logout', { method: 'POST', credentials: 'include' })
               .then(() => {
                 currentUser = null;
+                extraCommands = [];
                 printLine('logged out.');
               })
               .catch(() => printLine('connection error: could not reach auth service.'))
               .finally(() => addPromptLine(getPrompt()));
           }
           break;
-        default:
+        case 'adduser':
+          if (!extraCommands.some((entry) => entry.name === 'adduser')) {
+            // Not granted — behaves like any other unknown command.
+            addPromptLine(getPrompt());
+          } else if (args.length > 0) {
+            printLine('adduser: credentials must not be passed inline.');
+            printLine('Run "adduser" with no arguments and follow the prompts.');
+            addPromptLine(getPrompt());
+          } else {
+            mode = 'adduser-username';
+            addPromptLine(PROMPT_NEW_USERNAME);
+          }
+          break;
+        case 'whoami':
+          if (!extraCommands.some((entry) => entry.name === 'whoami')) {
+            // Not granted — behaves like any other unknown command.
+            addPromptLine(getPrompt());
+          } else {
+            // Dynamic — reflects the actual current request, so it always
+            // hits the server instead of printing a cached static string.
+            fetch('/whoami', { credentials: 'include' })
+              .then((res) => {
+                if (!res.ok) {
+                  printLine('whoami: permission denied.');
+                  return;
+                }
+                return res.json().then((info) => {
+                  printLine('ip:         ' + info.ip);
+                  printLine('location:   ' + info.location);
+                  printLine('browser:    ' + info.browser);
+                  printLine('engine:     ' + info.engine);
+                  printLine('os:         ' + info.os);
+                  printLine('device:     ' + info.device);
+                  printLine('language:   ' + info.language);
+                  printLine('referer:    ' + info.referer);
+                  printLine('user-agent: ' + info.userAgent);
+                });
+              })
+              .catch(() => printLine('connection error: could not reach the server.'))
+              .finally(() => addPromptLine(getPrompt()));
+          }
+          break;
+        default: {
+          const granted = extraCommands.find((entry) => entry.name === command);
+          if (granted) {
+            printLine(granted.response);
+          }
           addPromptLine(getPrompt());
+        }
       }
     }
 

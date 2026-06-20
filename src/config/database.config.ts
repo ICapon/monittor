@@ -1,3 +1,4 @@
+import { join } from 'path';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 
@@ -9,8 +10,13 @@ export const typeOrmConfig = (configService: ConfigService): TypeOrmModuleOption
   password: configService.get<string>('db.password'),
   database: configService.get<string>('db.name'),
   autoLoadEntities: true,
-  // Only ever true in local dev (see .env.example) — never in a shared
-  // environment, since it can silently alter/drop columns with no
-  // migration history. Use TypeORM migrations once this matters.
+  // Schema is now owned by migrations (src/database/migrations) — never
+  // set this to true outside a throwaway local DB, it can silently
+  // alter/drop columns with no history or rollback.
   synchronize: configService.get<boolean>('db.synchronize'),
+  migrations: [join(__dirname, '..', 'database', 'migrations', '*.{ts,js}')],
+  // Dev-only convenience (mirrors db.synchronize's split) — run migrations
+  // automatically on boot. In any shared/production environment, run
+  // `pnpm migration:run` as a deliberate, reviewed deploy step instead.
+  migrationsRun: configService.get<boolean>('db.migrationsRun'),
 });

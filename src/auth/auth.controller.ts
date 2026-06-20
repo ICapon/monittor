@@ -13,6 +13,7 @@ import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
 import { CookieOptions, Response } from 'express';
 import * as ms from 'ms';
+import { AccessibleCommand, CommandsService } from '../commands/commands.service';
 import { AuthenticatedRequest } from './middleware/auth.middleware';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
@@ -21,6 +22,7 @@ import { LoginDto } from './dto/login.dto';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly commandsService: CommandsService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -30,7 +32,7 @@ export class AuthController {
   async login(
     @Body() dto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<{ username: string }> {
+  ): Promise<{ username: string; commands: AccessibleCommand[] }> {
     const user = await this.authService.validateUser(dto.username, dto.password);
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
@@ -44,7 +46,8 @@ export class AuthController {
       maxAge: ms(expiresIn as ms.StringValue),
     });
 
-    return { username: user.username };
+    const commands = await this.commandsService.findAccessibleCommandsForUser(user.id);
+    return { username: user.username, commands };
   }
 
   // Idempotent on purpose: clearing a cookie that was never set (or already
@@ -60,8 +63,11 @@ export class AuthController {
   // Gated by AuthMiddleware (see auth.module.ts) — req.user is only set if
   // the cookie carried a valid, unexpired JWT.
   @Get('me')
-  me(@Req() req: AuthenticatedRequest): { username: string } {
-    return { username: req.user!.username };
+  async me(
+    @Req() req: AuthenticatedRequest,
+  ): Promise<{ username: string; commands: AccessibleCommand[] }> {
+    const commands = await this.commandsService.findAccessibleCommandsForUser(req.user!.sub);
+    return { username: req.user!.username, commands };
   }
 
   // Shared between login (res.cookie) and logout (res.clearCookie) — they

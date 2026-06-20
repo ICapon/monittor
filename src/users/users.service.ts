@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { CommandsService } from '../commands/commands.service';
 import { User } from './entities/user.entity';
 
 const BCRYPT_COST_FACTOR = 12;
@@ -14,25 +15,35 @@ export class UsersService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(User) private readonly usersRepository: Repository<User>,
     private readonly configService: ConfigService,
+    private readonly commandsService: CommandsService,
   ) {}
 
+  // Creating the admin only happens once (if missing), but granting its
+  // starting commands runs on every boot — grantCommandToUser is
+  // idempotent, so this also "heals" an admin that was created before a
+  // given command existed yet (exactly what happened in dev once already).
   async onApplicationBootstrap(): Promise<void> {
-    const existing = await this.count();
-    if (existing > 0) return;
-
     const username = this.configService.get<string>('seedAdmin.username');
     const password = this.configService.get<string>('seedAdmin.password');
     if (!username || !password) {
-      this.logger.warn(
-        'No users exist and SEED_ADMIN_USERNAME/SEED_ADMIN_PASSWORD are not set — skipping seed.',
-      );
+      if ((await this.count()) === 0) {
+        this.logger.warn(
+          'No users exist and SEED_ADMIN_USERNAME/SEED_ADMIN_PASSWORD are not set — skipping seed.',
+        );
+      }
       return;
     }
 
-    await this.createUser(username, password);
-    this.logger.log(
-      `Seeded initial admin user "${username}". Change this password after first login.`,
-    );
+    let admin = await this.findByUsername(username);
+    if (!admin) {
+      admin = await this.createUser(username, password);
+      this.logger.log(
+        `Seeded initial admin user "${username}". Change this password after first login.`,
+      );
+    }
+
+    await this.commandsService.grantCommandToUser(admin.id, 'adduser');
+    await this.commandsService.grantCommandToUser(admin.id, 'whoami');
   }
 
   count(): Promise<number> {

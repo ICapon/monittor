@@ -40,7 +40,13 @@ export class VisitMiddleware implements NestMiddleware {
       // prefix from them for middleware mounted via forRoutes('*'), so they
       // read as "/" for every request. req.originalUrl is untouched.
       const path = req.originalUrl.split('?')[0];
-      await this.visitsService.recordVisit(visitorId, info, path, session?.sub ?? null);
+      await this.visitsService.recordVisit(
+        visitorId,
+        info,
+        path,
+        session?.sub ?? null,
+        req.query as Record<string, unknown>,
+      );
     } catch (error) {
       // Never block the actual page render over a visit-tracking hiccup.
       this.logger.warn(`Failed to record visit: ${(error as Error).message}`);

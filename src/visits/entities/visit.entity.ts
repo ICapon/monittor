@@ -65,6 +65,13 @@ export class Visit {
   @Column({ type: 'int', default: 1 })
   visitCount!: number;
 
+  // Arbitrary query-string params seen on entry (utm_source, ref, whatever
+  // a shared link happened to carry) — merged across visits in
+  // VisitsService so a later visit without params never erases an earlier
+  // known source. Null if no visit ever carried any query params.
+  @Column({ type: 'jsonb', nullable: true })
+  metadata?: Record<string, unknown> | null;
+
   // First seen.
   @CreateDateColumn()
   createdAt!: Date;

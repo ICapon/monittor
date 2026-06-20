@@ -307,6 +307,38 @@
               .finally(() => addPromptLine(getPrompt()));
           }
           break;
+        case 'get-visits':
+          if (!extraCommands.some((entry) => entry.name === 'get-visits')) {
+            // Not granted — behaves like any other unknown command.
+            addPromptLine(getPrompt());
+          } else {
+            // Default page only (first 20, most recent first) — full
+            // limit/offset/desc/date filtering is available by calling
+            // GET /visits directly.
+            fetch('/visits', { credentials: 'include' })
+              .then((res) => {
+                if (!res.ok) {
+                  printLine('get-visits: permission denied.');
+                  return;
+                }
+                return res.json().then((data) => {
+                  if (data.items.length === 0) {
+                    printLine('no visits recorded.');
+                  } else {
+                    data.items.forEach((v) => {
+                      const seen = new Date(v.updatedAt).toISOString().slice(0, 16).replace('T', ' ');
+                      printLine(
+                        seen + '  ' + v.ip.padEnd(16, ' ') + v.lastPath.padEnd(14, ' ') + 'visits:' + v.visitCount,
+                      );
+                    });
+                  }
+                  printLine('showing ' + data.items.length + ' of ' + data.total + ' total visits.');
+                });
+              })
+              .catch(() => printLine('connection error: could not reach the server.'))
+              .finally(() => addPromptLine(getPrompt()));
+          }
+          break;
         default: {
           const granted = extraCommands.find((entry) => entry.name === command);
           if (granted) {

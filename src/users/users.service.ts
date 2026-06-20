@@ -44,6 +44,7 @@ export class UsersService implements OnApplicationBootstrap {
 
     await this.commandsService.grantCommandToUser(admin.id, 'adduser');
     await this.commandsService.grantCommandToUser(admin.id, 'whoami');
+    await this.commandsService.grantCommandToUser(admin.id, 'get-visits');
   }
 
   count(): Promise<number> {

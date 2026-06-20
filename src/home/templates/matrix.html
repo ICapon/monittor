@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>monitor-01 :: wake up</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    canvas#rain {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+
+    .stage {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    #typed {
+      color: #0f0;
+      font-size: clamp(22px, 5vw, 56px);
+      text-shadow: 0 0 8px #0f0, 0 0 18px rgba(0, 255, 0, 0.6);
+      letter-spacing: 1px;
+      white-space: pre-wrap;
+      text-align: center;
+      padding: 0 24px;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      background: #0f0;
+      vertical-align: -0.15em;
+      box-shadow: 0 0 8px #0f0;
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="rain"></canvas>
+
+  <div class="stage">
+    <div id="typed"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('rain');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const glyphs = 'アァカサタナハマヤラワ0123456789ABCDEF$#&%+-/\\';
+    const fontSize = 16;
+    let columns = Math.floor(canvas.width / fontSize);
+    let drops = new Array(columns).fill(1);
+
+    window.addEventListener('resize', () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      columns = Math.floor(canvas.width / fontSize);
+      drops = new Array(columns).fill(1);
+    });
+
+    function drawRain() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.font = fontSize + 'px monospace';
+      for (let i = 0; i < drops.length; i++) {
+        const glyph = glyphs[Math.floor(Math.random() * glyphs.length)];
+        const brightness = Math.random();
+        ctx.fillStyle = brightness > 0.95 ? '#cfffcf' : '#0f0';
+        ctx.fillText(glyph, i * fontSize, drops[i] * fontSize);
+        if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          drops[i] = 0;
+        }
+        drops[i]++;
+      }
+    }
+    setInterval(drawRain, 40);
+
+    // type out the message, then leave a blinking cursor
+    const message = 'Knock knock, Neo.';
+    const typed = document.getElementById('typed');
+    let i = 0;
+
+    function typeNext() {
+      if (i <= message.length) {
+        typed.textContent = message.slice(0, i);
+        i++;
+        setTimeout(typeNext, 120);
+      } else {
+        const cursor = document.createElement('span');
+        cursor.className = 'cursor';
+        typed.appendChild(cursor);
+      }
+    }
+    setTimeout(typeNext, 600);
+  </script>
+</body>
+</html>

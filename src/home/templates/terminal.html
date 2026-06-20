@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>monitor-01 :: terminal</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      font-family: 'Courier New', Courier, monospace;
+    }
+
+    .term-body {
+      position: fixed;
+      inset: 0;
+      padding: 20px 24px;
+      color: #0f0;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .term-line {
+      text-shadow: 0 0 4px #0f0;
+    }
+
+    .prompt {
+      color: #6f6;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 1em;
+      background: #0f0;
+      vertical-align: -0.15em;
+      animation: blink 1s steps(1) infinite;
+    }
+
+    @keyframes blink {
+      50% { opacity: 0; }
+    }
+
+    #hidden-input {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 1px;
+      height: 1px;
+      border: none;
+      outline: none;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="term-body" id="term-body">
+    <div class="term-line">Welcome to monitor-01. Type a command and press enter.</div>
+  </div>
+  <input id="hidden-input" autocomplete="off" autocapitalize="off" spellcheck="false" />
+
+  <script>
+    const PROMPT_USER = 'user: ';
+    const PROMPT_PASSWORD = 'password: ';
+
+    const termBody = document.getElementById('term-body');
+    const hiddenInput = document.getElementById('hidden-input');
+
+    let mode = 'command';
+    let pendingUsername = '';
+    // Replaced server-side (see home.controller.ts) with the username from
+    // the session cookie, if any — no extra request needed to know who's
+    // already logged in.
+    let currentUser = /*__CURRENT_USER__*/ null;
+
+    function getPrompt() {
+      return (currentUser || 'root') + '@monitor-01:~$ ';
+    }
+
+    function focusInput() {
+      hiddenInput.focus({ preventScroll: true });
+    }
+
+    function currentLine() {
+      return document.querySelector('.term-line.current');
+    }
+
+    function addPromptLine(promptText, masked) {
+      const line = document.createElement('div');
+      line.className = 'term-line current';
+      if (masked) line.dataset.masked = 'true';
+
+      // Built with createElement/textContent (not innerHTML) because
+      // promptText can contain a logged-in username — untrusted input must
+      // never be parsed as markup, even though it only reaches this page
+      // through an authenticated session today.
+      const promptSpan = document.createElement('span');
+      promptSpan.className = 'prompt';
+      promptSpan.textContent = promptText;
+
+      const typedSpan = document.createElement('span');
+      typedSpan.className = 'typed-text';
+
+      const cursorSpan = document.createElement('span');
+      cursorSpan.className = 'cursor';
+
+      line.append(promptSpan, typedSpan, cursorSpan);
+      termBody.appendChild(line);
+      termBody.scrollTop = termBody.scrollHeight;
+    }
+
+    function printLine(text) {
+      const line = document.createElement('div');
+      line.className = 'term-line';
+      line.textContent = text;
+      termBody.appendChild(line);
+      termBody.scrollTop = termBody.scrollHeight;
+    }
+
+    function updateCurrentLine() {
+      const line = currentLine();
+      const masked = line.dataset.masked === 'true';
+      line.querySelector('.typed-text').textContent = masked
+        ? '•'.repeat(hiddenInput.value.length)
+        : hiddenInput.value;
+      termBody.scrollTop = termBody.scrollHeight;
+    }
+
+    function freezeCurrentLine() {
+      const line = currentLine();
+      line.classList.remove('current');
+      line.querySelector('.cursor').remove();
+    }
+
+    function handleEnter() {
+      const value = hiddenInput.value;
+      freezeCurrentLine();
+      hiddenInput.value = '';
+
+      if (mode === 'auth-user') {
+        pendingUsername = value;
+        mode = 'auth-password';
+        addPromptLine(PROMPT_PASSWORD, true);
+        return;
+      }
+
+      if (mode === 'auth-password') {
+        mode = 'command';
+        fetch('/auth/login', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: pendingUsername, password: value }),
+        })
+          .then((res) => {
+            if (!res.ok) {
+              printLine('access denied: invalid credentials.');
+              return;
+            }
+            return res.json().then((data) => {
+              currentUser = data.username;
+              printLine('access granted.');
+            });
+          })
+          .catch(() => printLine('connection error: could not reach auth service.'))
+          .finally(() => {
+            pendingUsername = '';
+            addPromptLine(getPrompt());
+          });
+        return;
+      }
+
+      const [command, ...args] = value.trim().split(/\s+/).filter(Boolean);
+
+      switch (command) {
+        case 'clear':
+          termBody.innerHTML = '';
+          addPromptLine(getPrompt());
+          break;
+        case 'help':
+          printLine('clear            clear the terminal screen');
+          printLine('help             show available commands');
+          printLine('auth             authenticate with a username and password');
+          printLine('                 (run with no arguments; password is entered');
+          printLine('                 at a separate hidden prompt, never inline)');
+          printLine('logout           end the current session');
+          addPromptLine(getPrompt());
+          break;
+        case 'auth':
+          if (args.length > 0) {
+            printLine('auth: credentials must not be passed inline.');
+            printLine('Run "auth" with no arguments and follow the prompts.');
+            addPromptLine(getPrompt());
+          } else {
+            mode = 'auth-user';
+            addPromptLine(PROMPT_USER);
+          }
+          break;
+        case 'logout':
+          if (!currentUser) {
+            printLine('not logged in.');
+            addPromptLine(getPrompt());
+          } else {
+            fetch('/auth/logout', { method: 'POST', credentials: 'include' })
+              .then(() => {
+                currentUser = null;
+                printLine('logged out.');
+              })
+              .catch(() => printLine('connection error: could not reach auth service.'))
+              .finally(() => addPromptLine(getPrompt()));
+          }
+          break;
+        default:
+          addPromptLine(getPrompt());
+      }
+    }
+
+    hiddenInput.addEventListener('input', updateCurrentLine);
+    hiddenInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleEnter();
+      }
+    });
+
+    document.addEventListener('click', focusInput);
+    window.addEventListener('load', focusInput);
+
+    if (currentUser) {
+      printLine('session restored: logged in as ' + currentUser + '.');
+    }
+    addPromptLine(getPrompt());
+  </script>
+</body>
+</html>
